@@ -25,6 +25,8 @@ jobs:
           context: .
           containerfiles: |
             Dockerfile
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GH_PAT }}" | buildah login --username ${{ github.actor }} --password-stdin ghcr.io
       - name: 🚀 Push Docker Runner Image 
         run: |
           echo "Pushing runner image to ECR..."
