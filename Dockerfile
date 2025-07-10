@@ -6,5 +6,7 @@ RUN sudo apt-get update \
     && sudo apt-get upgrade -y 
 RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
 
+# install node
+RUN  bash -c "source $NVM_DIR/nvm.sh"
 
 RUN sudo npm install --global yarn@latest 
