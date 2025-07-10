@@ -19,13 +19,13 @@ jobs:
       - name: 🔨 Build Runner Image
         uses: redhat-actions/buildah-build@v2
         with:
-          image: github-action-runner:latest
+          image: ghcr.io/crystal-chain/github-action-runner:latest
           platforms: linux/amd64
-          tags: github-action-runner:latest
+          tags: ghcr.io/crystal-chain/github-action-runner:latest
           context: .
           containerfiles: |
             Dockerfile
       - name: 🚀 Push Docker Runner Image 
         run: |
           echo "Pushing runner image to ECR..."
-          buildah push github-action-runner:latest
+          buildah push ghcr.io/crystal-chain/github-action-runner:latest
