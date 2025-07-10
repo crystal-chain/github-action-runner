@@ -10,7 +10,5 @@ RUN export NVM_DIR="$HOME/.nvm" \
     && nvm install $NODE_VERSION \
     && nvm use $NODE_VERSION \
     && nvm alias default $NODE_VERSION
-# install node
-RUN  bash -c "source $NVM_DIR/nvm.sh"
 
 RUN sudo npm install --global yarn@latest 
