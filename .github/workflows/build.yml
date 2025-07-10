@@ -1,0 +1,31 @@
+name: Build and Publish Docker Image
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2 
+      - name: install buildah 
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y buildah
+      - name: 🔨 Build Runner Image
+        uses: redhat-actions/buildah-build@v2
+        with:
+          image: github-action-runner:latest
+          platforms: linux/amd64
+          tags: github-action-runner:latest
+          context: .
+          containerfiles: |
+            Dockerfile
+      - name: 🚀 Push Docker Runner Image 
+        run: |
+          echo "Pushing runner image to ECR..."
+          buildah push github-action-runner:latest
