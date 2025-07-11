@@ -12,6 +12,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2 
+      - name: Set build date tag
+        id: date
+        run: echo "TAG=$(date +'%Y%m%d')" >> $GITHUB_ENV
       - name: install buildah 
         run: |
           sudo apt-get update
@@ -19,9 +22,9 @@ jobs:
       - name: 🔨 Build Runner Image
         uses: redhat-actions/buildah-build@v2
         with:
-          image: ghcr.io/crystal-chain/github-action-runner:latest
+          image: ghcr.io/crystal-chain/github-action-runner:${{ env.TAG }}
           platforms: linux/amd64
-          tags: ghcr.io/crystal-chain/github-action-runner:latest
+          tags: ghcr.io/crystal-chain/github-action-runner:${{ env.TAG }}
           context: .
           containerfiles: |
             Dockerfile
@@ -30,4 +33,4 @@ jobs:
       - name: 🚀 Push Docker Runner Image 
         run: |
           echo "Pushing runner image to ECR..."
-          buildah push ghcr.io/crystal-chain/github-action-runner:latest
+          buildah push ghcr.io/crystal-chain/github-action-runner:${{ env.TAG }}
