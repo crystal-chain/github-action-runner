@@ -1,5 +1,5 @@
 # ---------------------------------------------------------
-FROM ubuntu:jammy
+FROM ubuntu:24.04
 
 ARG RUNNER_VERSION="2.327.0"          # bump as needed
 ARG RUNNER_CONTAINER_HOOKS_VERSION="0.7.0"
@@ -10,10 +10,18 @@ ENV DEBIAN_FRONTEND=noninteractive
 # 1. Base OS packages (build-essential, git, docker-cli, etc.)
 RUN apt-get update && apt-get install -y \
       curl sudo jq git build-essential unzip zip \
-      docker.io docker-buildx-plugin docker-compose-plugin \
       software-properties-common apt-transport-https ca-certificates gnupg lsb-release \
     && rm -rf /var/lib/apt/lists/*
-
+# --- Add Docker's official repo and install Engine + CLI + plugins ----------
+RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] \
+      https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+      | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
+    apt-get update && \
+    apt-get install -y \
+        docker-ce docker-ce-cli containerd.io \
+        docker-buildx-plugin docker-compose-plugin
 # 2. Add the actions/runner user & install the runner itself
 RUN useradd -m -s /bin/bash runner
 WORKDIR /home/runner
@@ -35,19 +43,13 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
  && apt-get install -y nodejs
 
 ## Python 3.11 + pipx
-RUN add-apt-repository ppa:deadsnakes/ppa \
- && apt-get update \
- && apt-get install -y python3.11 python3.11-venv python3-pip \
- && pip3 install --upgrade pip pipx
-
-## OpenJDK 17 (Temurin)
-RUN mkdir -p /etc/apt/keyrings \
- && curl -fsSL https://packages.adoptium.net/artifactory/api/gpg/key/public | tee /etc/apt/keyrings/adoptium.asc \
- && echo "deb [signed-by=/etc/apt/keyrings/adoptium.asc] https://packages.adoptium.net/artifactory/deb stable main" > /etc/apt/sources.list.d/adoptium.list \
- && apt-get update && apt-get install -y temurin-17-jdk
+#RUN add-apt-repository ppa:deadsnakes/ppa \
+# && apt-get update \
+# && apt-get install -y python3.13 python3.13-venv python3-pip \
+# && pip3 install --upgrade pip pipx
 
 ## .NET 8
-RUN curl -fsSL https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -o packages-microsoft-prod.deb \
+RUN curl -fsSL https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb -o packages-microsoft-prod.deb \
  && dpkg -i packages-microsoft-prod.deb \
  && apt-get update && apt-get install -y dotnet-sdk-8.0
 
@@ -65,9 +67,9 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - \
 RUN corepack enable && corepack prepare yarn@stable --activate
 
 RUN . /etc/os-release \
- && sudo sh -c "echo 'deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/x${NAME}_${VERSION_ID}/ /' \
+ && sudo sh -c "echo 'deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_22.04/ /' \
       > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list" \
- && curl -fsSL https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/x${NAME}_${VERSION_ID}/Release.key \
+ && curl -fsSL https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_22.04/Release.key \
       | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/libcontainers.gpg > /dev/null \
  && sudo apt-get update \
  && sudo apt-get install -y buildah
@@ -79,7 +81,7 @@ RUN mkdir -p "$RUNNER_TOOL_CACHE" && chown -R runner:runner "$RUNNER_TOOL_CACHE"
 
 # 6. Labels (good practice)
 LABEL org.opencontainers.image.source="https://github.com/crystal-chain/github-action-runner"
-LABEL org.opencontainers.image.description="Ubuntu 22.04 based GitHub Actions runner with build tools & multiple SDKs"
+LABEL org.opencontainers.image.description="Ubuntu 24.04 based GitHub Actions runner with build tools & multiple SDKs"
 
 # 7. Entrypoint
 COPY run.sh /home/runner/run.sh
