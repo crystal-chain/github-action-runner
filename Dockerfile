@@ -1,129 +1,88 @@
-FROM ubuntu:24.04
+# ---------------------------------------------------------
+FROM ubuntu:jammy
 
-ARG TARGETPLATFORM=linux/amd64
-ARG RUNNER_VERSION=2.324.0
-ARG RUNNER_CONTAINER_HOOKS_VERSION=0.7.0
-# Docker and Docker Compose arguments
-ARG CHANNEL=stable
-ARG DOCKER_VERSION=24.0.7
-ARG DOCKER_COMPOSE_VERSION=v2.23.0
-ARG DUMB_INIT_VERSION=1.2.5
-ARG RUNNER_USER_UID=1001
-ARG DOCKER_GROUP_GID=121
+ARG RUNNER_VERSION="2.327.0"          # bump as needed
+ARG RUNNER_CONTAINER_HOOKS_VERSION="0.7.0"
 
+# Prevent interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update -y \
-    && apt-get install -y software-properties-common \
-    && add-apt-repository -y ppa:git-core/ppa \
-    && apt-get update -y \
-    && apt-get install -y --no-install-recommends \
-    curl \
-    ca-certificates \
-    awscli \
-    build-essential \
-    ca-certificates \
-    file \
-    nodejs \
-    npm \
-    qemu-user-static \
-    binfmt-support \
-    git \
-    jq \
-    sudo \
-    unzip \
-    zip \
+
+# 1. Base OS packages (build-essential, git, docker-cli, etc.)
+RUN apt-get update && apt-get install -y \
+      curl sudo jq git build-essential unzip zip \
+      docker.io docker-buildx-plugin docker-compose-plugin \
+      software-properties-common apt-transport-https ca-certificates gnupg lsb-release \
     && rm -rf /var/lib/apt/lists/*
 
-# Download latest git-lfs version
-RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash && \
-    apt-get install -y --no-install-recommends git-lfs
+# 2. Add the actions/runner user & install the runner itself
+RUN useradd -m -s /bin/bash runner
+WORKDIR /home/runner
+RUN curl -L -o runner.tar.gz \
+      https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz \
+ && tar xzf runner.tar.gz \
+ && ./bin/installdependencies.sh \
+ && rm runner.tar.gz
 
-RUN adduser --disabled-password --gecos "" --uid $RUNNER_USER_UID runner \
-    && groupadd docker --gid $DOCKER_GROUP_GID \
-    && usermod -aG sudo runner \
-    && usermod -aG docker runner \
-    && echo "%sudo   ALL=(ALL:ALL) NOPASSWD:ALL" > /etc/sudoers \
-    && echo "Defaults env_keep += \"DEBIAN_FRONTEND\"" >> /etc/sudoers
+# 3. Install container hooks (optional, for k8s jobs)
+RUN curl -f -L -o runner-container-hooks.zip \
+      https://github.com/actions/runner-container-hooks/releases/download/v${RUNNER_CONTAINER_HOOKS_VERSION}/actions-runner-hooks-k8s-${RUNNER_CONTAINER_HOOKS_VERSION}.zip \
+ && unzip runner-container-hooks.zip -d ./k8s \
+ && rm runner-container-hooks.zip
 
-ENV HOME=/home/runner
+# 4. Pre-load language SDKs (adjust versions or add more as you wish)
+## Node.js LTS
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+ && apt-get install -y nodejs
 
-RUN export ARCH=$(echo ${TARGETPLATFORM} | cut -d / -f2) \
-    && if [ "$ARCH" = "arm64" ]; then export ARCH=aarch64 ; fi \
-    && if [ "$ARCH" = "amd64" ] || [ "$ARCH" = "i386" ]; then export ARCH=x86_64 ; fi \
-    && curl -fLo /usr/bin/dumb-init https://github.com/Yelp/dumb-init/releases/download/v${DUMB_INIT_VERSION}/dumb-init_${DUMB_INIT_VERSION}_${ARCH} \
-    && chmod +x /usr/bin/dumb-init
+## Python 3.11 + pipx
+RUN add-apt-repository ppa:deadsnakes/ppa \
+ && apt-get update \
+ && apt-get install -y python3.11 python3.11-venv python3-pip \
+ && pip3 install --upgrade pip pipx
 
-ENV RUNNER_ASSETS_DIR=/runnertmp
-RUN export ARCH=$(echo ${TARGETPLATFORM} | cut -d / -f2) \
-    && if [ "$ARCH" = "amd64" ] || [ "$ARCH" = "x86_64" ] || [ "$ARCH" = "i386" ]; then export ARCH=x64 ; fi \
-    && mkdir -p "$RUNNER_ASSETS_DIR" \
-    && cd "$RUNNER_ASSETS_DIR" \
-    && curl -fLo runner.tar.gz https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-${ARCH}-${RUNNER_VERSION}.tar.gz \
-    && tar xzf ./runner.tar.gz \
-    && rm runner.tar.gz \
-    && ./bin/installdependencies.sh \
-    && mv ./externals ./externalstmp \
-    # libyaml-dev is required for ruby/setup-ruby action.
-    # It is installed after installdependencies.sh and before removing /var/lib/apt/lists
-    # to avoid rerunning apt-update on its own.
-    && apt-get install -y libyaml-dev \
-    && rm -rf /var/lib/apt/lists/*
+## OpenJDK 17 (Temurin)
+RUN mkdir -p /etc/apt/keyrings \
+ && curl -fsSL https://packages.adoptium.net/artifactory/api/gpg/key/public | tee /etc/apt/keyrings/adoptium.asc \
+ && echo "deb [signed-by=/etc/apt/keyrings/adoptium.asc] https://packages.adoptium.net/artifactory/deb stable main" > /etc/apt/sources.list.d/adoptium.list \
+ && apt-get update && apt-get install -y temurin-17-jdk
 
+## .NET 8
+RUN curl -fsSL https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -o packages-microsoft-prod.deb \
+ && dpkg -i packages-microsoft-prod.deb \
+ && apt-get update && apt-get install -y dotnet-sdk-8.0
+
+## Go 1.22
+RUN curl -L https://go.dev/dl/go1.22.3.linux-amd64.tar.gz | tar -C /usr/local -xzf - \
+ && ln -s /usr/local/go/bin/go /usr/local/bin/go
+
+## Rust stable
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/home/runner/.cargo/bin:${PATH}"
+
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - \
+ && sudo apt-get install -y nodejs
+
+RUN corepack enable && corepack prepare yarn@stable --activate
+
+RUN . /etc/os-release \
+ && sudo sh -c "echo 'deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/x${NAME}_${VERSION_ID}/ /' \
+      > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list" \
+ && curl -fsSL https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/x${NAME}_${VERSION_ID}/Release.key \
+      | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/libcontainers.gpg > /dev/null \
+ && sudo apt-get update \
+ && sudo apt-get install -y buildah
+
+# 5. Pre-populate GitHub tool cache (optional but speeds up setup-* actions)
+#    See https://www.kenmuse.com/blog/building-github-actions-runner-images-with-a-tool-cache/ [^6^]
 ENV RUNNER_TOOL_CACHE=/opt/hostedtoolcache
-RUN mkdir /opt/hostedtoolcache \
-    && chgrp docker /opt/hostedtoolcache \
-    && chmod g+rwx /opt/hostedtoolcache
+RUN mkdir -p "$RUNNER_TOOL_CACHE" && chown -R runner:runner "$RUNNER_TOOL_CACHE"
 
-RUN cd "$RUNNER_ASSETS_DIR" \
-    && curl -fLo runner-container-hooks.zip https://github.com/actions/runner-container-hooks/releases/download/v${RUNNER_CONTAINER_HOOKS_VERSION}/actions-runner-hooks-k8s-${RUNNER_CONTAINER_HOOKS_VERSION}.zip \
-    && unzip ./runner-container-hooks.zip -d ./k8s \
-    && rm -f runner-container-hooks.zip
+# 6. Labels (good practice)
+LABEL org.opencontainers.image.source="https://github.com/crystal-chain/github-action-runner"
+LABEL org.opencontainers.image.description="Ubuntu 22.04 based GitHub Actions runner with build tools & multiple SDKs"
 
-RUN set -vx; \
-    export ARCH=$(echo ${TARGETPLATFORM} | cut -d / -f2) \
-    && if [ "$ARCH" = "arm64" ]; then export ARCH=aarch64 ; fi \
-    && if [ "$ARCH" = "amd64" ] || [ "$ARCH" = "i386" ]; then export ARCH=x86_64 ; fi \
-    && curl -fLo docker.tgz https://download.docker.com/linux/static/${CHANNEL}/${ARCH}/docker-${DOCKER_VERSION}.tgz \
-    && tar zxvf docker.tgz \
-    && install -o root -g root -m 755 docker/docker /usr/bin/docker \
-    && rm -rf docker docker.tgz
-
-RUN export ARCH=$(echo ${TARGETPLATFORM} | cut -d / -f2) \
-    && if [ "$ARCH" = "arm64" ]; then export ARCH=aarch64 ; fi \
-    && if [ "$ARCH" = "amd64" ] || [ "$ARCH" = "i386" ]; then export ARCH=x86_64 ; fi \
-    && mkdir -p /usr/libexec/docker/cli-plugins \
-    && curl -fLo /usr/libexec/docker/cli-plugins/docker-compose https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-${ARCH} \
-    && chmod +x /usr/libexec/docker/cli-plugins/docker-compose \
-    && ln -s /usr/libexec/docker/cli-plugins/docker-compose /usr/bin/docker-compose \
-    && which docker-compose \
-    && docker compose version
-RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-RUN export NVM_DIR="$HOME/.nvm" \
-    && [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" \
-    && nvm install $NODE_VERSION \
-    && nvm use $NODE_VERSION \
-    && nvm alias default $NODE_VERSION
-RUN npm install --global yarn@latest
-
-# We place the scripts in `/usr/bin` so that users who extend this image can
-# override them with scripts of the same name placed in `/usr/local/bin`.
-COPY entrypoint.sh startup.sh logger.sh graceful-stop.sh update-status /usr/bin/
-
-# Copy the docker shim which propagates the docker MTU to underlying networks
-# to replace the docker binary in the PATH.
-COPY docker-shim.sh /usr/local/bin/docker
-
-# Configure hooks folder structure.
-COPY hooks /etc/arc/hooks/
-
-# Add the Python "User Script Directory" to the PATH
-ENV PATH="${PATH}:${HOME}/.local/bin/"
-ENV ImageOS=ubuntu24
-
-RUN echo "PATH=${PATH}" > /etc/environment \
-    && echo "ImageOS=${ImageOS}" >> /etc/environment
-
+# 7. Entrypoint
+COPY run.sh /home/runner/run.sh
+RUN chmod +x /home/runner/run.sh
 USER runner
-
-ENTRYPOINT ["/bin/bash", "-c"]
-CMD ["entrypoint.sh"]
+ENTRYPOINT ["/home/runner/run.sh"]
