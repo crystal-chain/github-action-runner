@@ -83,8 +83,17 @@ RUN mkdir -p "$RUNNER_TOOL_CACHE" && chown -R runner:runner "$RUNNER_TOOL_CACHE"
 LABEL org.opencontainers.image.source="https://github.com/crystal-chain/github-action-runner"
 LABEL org.opencontainers.image.description="Ubuntu 24.04 based GitHub Actions runner with build tools & multiple SDKs"
 
-# 7. Entrypoint
-COPY run.sh /home/runner/run.sh
-RUN chmod +x /home/runner/run.sh
+COPY entrypoint.sh startup.sh logger.sh graceful-stop.sh update-status /usr/bin/
+COPY docker-shim.sh /usr/local/bin/docker
+COPY hooks /etc/arc/hooks/
+
+# Same env as official image
+ENV ImageOS=ubuntu24
+ENV PATH="${PATH}:${HOME}/.local/bin"
+RUN echo "PATH=${PATH}" > /etc/environment \
+ && echo "ImageOS=${ImageOS}" >> /etc/environment
+
 USER runner
-ENTRYPOINT ["/home/runner/run.sh"]
+
+ENTRYPOINT ["/bin/bash", "-c"]
+CMD ["entrypoint.sh"]
