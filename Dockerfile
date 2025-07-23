@@ -9,7 +9,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # 1. Base OS packages (build-essential, git, docker-cli, etc.)
 RUN apt-get update && apt-get install -y \
-      curl sudo jq git build-essential unzip zip \
+      curl sudo jq git build-essential unzip zip aws-cli \
       software-properties-common apt-transport-https ca-certificates gnupg lsb-release \
     && rm -rf /var/lib/apt/lists/*
 # --- Add Docker's official repo and install Engine + CLI + plugins ----------
