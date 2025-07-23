@@ -9,7 +9,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # 1. Base OS packages (build-essential, git, docker-cli, etc.)
 RUN apt-get update && apt-get install -y \
-      curl sudo jq git build-essential unzip zip aws-cli \
+      curl sudo jq git build-essential unzip zip \
       software-properties-common apt-transport-https ca-certificates gnupg lsb-release \
     && rm -rf /var/lib/apt/lists/*
 # --- Add Docker's official repo and install Engine + CLI + plugins ----------
@@ -22,6 +22,10 @@ RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /
     apt-get install -y \
         docker-ce docker-ce-cli containerd.io \
         docker-buildx-plugin docker-compose-plugin
+RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip \
+ && unzip awscliv2.zip \
+ && ./aws/install \
+ && rm -rf awscliv2.zip aws
 # 2. Add the actions/runner user & install the runner itself
 RUN useradd -m -s /bin/bash runner
 WORKDIR /home/runner
