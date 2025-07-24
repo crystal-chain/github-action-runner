@@ -78,6 +78,26 @@ RUN . /etc/os-release \
  && sudo apt-get update \
  && sudo apt-get install -y buildah
 
+ RUN curl -s https://api.github.com/repos/kubernetes-sigs/kustomize/releases?per_page=1 \
+  | jq -r '.[0].assets[] | select(.name|test("kustomize.*linux_amd64.tar.gz")).browser_download_url' \
+  | xargs curl -fsSL -o kustomize.tar.gz \
+ && tar -xzf kustomize.tar.gz -C /tmp \
+ && mv /tmp/kustomize /usr/local/bin/kustomize \
+ && chmod +x /usr/local/bin/kustomize \
+ && rm kustomize.tar.gz
+
+RUN curl -fsSL "$(curl -s https://checkpoint-api.hashicorp.com/v1/check/terraform | jq -r -M '.current_download_url')/terraform_$(curl -s https://checkpoint-api.hashicorp.com/v1/check/terraform | jq -r -M '.current_version')_linux_amd64.zip" -o terraform.zip \
+ && unzip terraform.zip \
+ && mv terraform /usr/local/bin/terraform \
+ && chmod +x /usr/local/bin/terraform \
+ && rm terraform.zip
+
+RUN apt-get update && apt-get install -y python3-pip pipx \
+ && pipx install --global ansible \
+ && ln -s /opt/pipx_bin/ansible-playbook /usr/local/bin/ansible-playbook \
+ && ln -s /opt/pipx_bin/ansible /usr/local/bin/ansible
+
+# ------------------------------------------------------------------
 # 5. Pre-populate GitHub tool cache (optional but speeds up setup-* actions)
 #    See https://www.kenmuse.com/blog/building-github-actions-runner-images-with-a-tool-cache/ [^6^]
 ENV RUNNER_TOOL_CACHE=/opt/hostedtoolcache
