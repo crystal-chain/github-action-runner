@@ -141,7 +141,15 @@ install_yarn() {
     echo "--------------------------------------------"
     corepack enable && corepack prepare yarn@stable --activate
 }
-
+install_podman() {
+    echo "--------------------------------------------"
+    echo "Installing Podman..."
+    echo "--------------------------------------------"
+    apt-get -y -qq update
+    apt-get -y install podman
+    # Ensure podman is available in the PATH
+    ln -s /usr/bin/podman /usr/local/bin/podman
+}
 # Function to install Buildah
 install_buildah() {
     echo "--------------------------------------------"
@@ -154,6 +162,7 @@ install_buildah() {
     git checkout v1.40.1
     make
     make install
+    echo "buildah version: $(buildah --version)"
     cd ..
     rm -rf buildah
 }
@@ -232,6 +241,7 @@ main() {
     #install_rust
     install_nodejs
     install_yarn
+    install_podman
     install_buildah
     install_kustomize
     install_terraform
