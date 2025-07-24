@@ -78,13 +78,7 @@ RUN . /etc/os-release \
  && sudo apt-get update \
  && sudo apt-get install -y buildah
 
- RUN curl -s https://api.github.com/repos/kubernetes-sigs/kustomize/releases?per_page=1 \
-  | jq -r '.[0].assets[] | select(.name|test("kustomize.*linux_amd64.tar.gz")).browser_download_url' \
-  | xargs curl -fsSL -o kustomize.tar.gz \
- && tar -xzf kustomize.tar.gz -C /tmp \
- && mv /tmp/kustomize /usr/local/bin/kustomize \
- && chmod +x /usr/local/bin/kustomize \
- && rm kustomize.tar.gz
+RUN curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"  | bash
 
 RUN curl -fsSL "$(curl -s https://checkpoint-api.hashicorp.com/v1/check/terraform | jq -r -M '.current_download_url')/terraform_$(curl -s https://checkpoint-api.hashicorp.com/v1/check/terraform | jq -r -M '.current_version')_linux_amd64.zip" -o terraform.zip \
  && unzip terraform.zip \
