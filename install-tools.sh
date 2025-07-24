@@ -178,11 +178,7 @@ install_ansible() {
     echo "--------------------------------------------"
     echo "Installing Ansible..."
     echo "--------------------------------------------"
-    apt-get update
-    apt-get install -y python3-pip pipx
-    pipx install --global ansible
-    ln -s /opt/pipx_bin/ansible-playbook /usr/local/bin/ansible-playbook
-    ln -s /opt/pipx_bin/ansible /usr/local/bin/ansible
+    python3 -m pip install --user ansible
 }
 
 # Function to set up GitHub tool cache
