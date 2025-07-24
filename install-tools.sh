@@ -173,13 +173,6 @@ install_terraform() {
     rm terraform.zip
 }
 
-# Function to install Ansible (includes python3-pip and pipx)
-install_ansible() {
-    echo "--------------------------------------------"
-    echo "Installing Ansible..."
-    echo "--------------------------------------------"
-    python3 -m pip install --user ansible
-}
 
 # Function to set up GitHub tool cache
 install_tool_cache() {
@@ -233,7 +226,6 @@ main() {
     install_buildah
     install_kustomize
     install_terraform
-    install_ansible
     install_tool_cache
 
     # Capture environment (matches original Dockerfile's final RUN for /etc/environment)
