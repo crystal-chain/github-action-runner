@@ -154,9 +154,7 @@ install_kustomize() {
     echo "--------------------------------------------"
     echo "Installing Kustomize..."
     echo "--------------------------------------------"
-    curl -s https://api.github.com/repos/kubernetes-sigs/kustomize/releases?per_page=1 \
-        | jq -r '.[0].assets[] | select(.name|test("kustomize.*linux_amd64.tar.gz")).browser_download_url' \
-        | xargs curl -fsSL -o kustomize.tar.gz
+    curl -fsSL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.7.1/kustomize_v5.7.1_linux_amd64.tar.gz -o kustomize.tar.gz
     tar -xzf kustomize.tar.gz -C /tmp
     mv /tmp/kustomize /usr/local/bin/kustomize
     chmod +x /usr/local/bin/kustomize
@@ -168,7 +166,7 @@ install_terraform() {
     echo "--------------------------------------------"
     echo "Installing Terraform..."
     echo "--------------------------------------------"
-    curl -fsSL "$(curl -s https://checkpoint-api.hashicorp.com/v1/check/terraform | jq -r -M '.current_download_url')/terraform_$(curl -s https://checkpoint-api.hashicorp.com/v1/check/terraform | jq -r -M '.current_version')_linux_amd64.zip" -o terraform.zip
+    curl -fsSL https://releases.hashicorp.com/terraform/1.12.2/terraform_1.12.2_linux_amd64.zip -o terraform.zip
     unzip terraform.zip
     mv terraform /usr/local/bin/terraform
     chmod +x /usr/local/bin/terraform
