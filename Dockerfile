@@ -7,96 +7,11 @@ ARG RUNNER_CONTAINER_HOOKS_VERSION="0.7.0"
 # Prevent interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 1. Base OS packages (build-essential, git, docker-cli, etc.)
-RUN apt-get update && apt-get install -y \
-      curl sudo jq git build-essential unzip zip \
-      software-properties-common apt-transport-https ca-certificates gnupg lsb-release \
-    && rm -rf /var/lib/apt/lists/*
-# --- Add Docker's official repo and install Engine + CLI + plugins ----------
-RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
-    echo \
-      "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] \
-      https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
-      | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
-    apt-get update && \
-    apt-get install -y \
-        docker-ce docker-ce-cli containerd.io \
-        docker-buildx-plugin docker-compose-plugin
-RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip \
- && unzip awscliv2.zip \
- && ./aws/install \
- && rm -rf awscliv2.zip aws
-# 2. Add the actions/runner user & install the runner itself
-RUN useradd -m -s /bin/bash runner
-WORKDIR /home/runner
-RUN curl -L -o runner.tar.gz \
-      https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz \
- && tar xzf runner.tar.gz \
- && ./bin/installdependencies.sh \
- && rm runner.tar.gz
-
-# 3. Install container hooks (optional, for k8s jobs)
-RUN curl -f -L -o runner-container-hooks.zip \
-      https://github.com/actions/runner-container-hooks/releases/download/v${RUNNER_CONTAINER_HOOKS_VERSION}/actions-runner-hooks-k8s-${RUNNER_CONTAINER_HOOKS_VERSION}.zip \
- && unzip runner-container-hooks.zip -d ./k8s \
- && rm runner-container-hooks.zip
-
-# 4. Pre-load language SDKs (adjust versions or add more as you wish)
-## Node.js LTS
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
- && apt-get install -y nodejs
-
-## Python 3.11 + pipx
-#RUN add-apt-repository ppa:deadsnakes/ppa \
-# && apt-get update \
-# && apt-get install -y python3.13 python3.13-venv python3-pip \
-# && pip3 install --upgrade pip pipx
-
-## .NET 8
-RUN curl -fsSL https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb -o packages-microsoft-prod.deb \
- && dpkg -i packages-microsoft-prod.deb \
- && apt-get update && apt-get install -y dotnet-sdk-8.0
-
-## Go 1.22
-RUN curl -L https://go.dev/dl/go1.22.3.linux-amd64.tar.gz | tar -C /usr/local -xzf - \
- && ln -s /usr/local/go/bin/go /usr/local/bin/go
-
-## Rust stable
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-ENV PATH="/home/runner/.cargo/bin:${PATH}"
-
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - \
- && sudo apt-get install -y nodejs
-
-RUN corepack enable && corepack prepare yarn@stable --activate
-
-RUN . /etc/os-release \
- && sudo sh -c "echo 'deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_22.04/ /' \
-      > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list" \
- && curl -fsSL https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_22.04/Release.key \
-      | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/libcontainers.gpg > /dev/null \
- && sudo apt-get update \
- && sudo apt-get install -y buildah
-
-RUN curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"  | bash
-
-RUN curl -fsSL "$(curl -s https://checkpoint-api.hashicorp.com/v1/check/terraform | jq -r -M '.current_download_url')/terraform_$(curl -s https://checkpoint-api.hashicorp.com/v1/check/terraform | jq -r -M '.current_version')_linux_amd64.zip" -o terraform.zip \
- && unzip terraform.zip \
- && mv terraform /usr/local/bin/terraform \
- && chmod +x /usr/local/bin/terraform \
- && rm terraform.zip
-
-RUN apt-get update && apt-get install -y python3-pip pipx \
- && pipx install --global ansible \
- && ln -s /opt/pipx_bin/ansible-playbook /usr/local/bin/ansible-playbook \
- && ln -s /opt/pipx_bin/ansible /usr/local/bin/ansible
-
-# ------------------------------------------------------------------
-# 5. Pre-populate GitHub tool cache (optional but speeds up setup-* actions)
-#    See https://www.kenmuse.com/blog/building-github-actions-runner-images-with-a-tool-cache/ [^6^]
+# Copy and run the installation script
+COPY install-tools.sh /install-tools.sh
+RUN /bin/bash /install-tools.sh ${RUNNER_VERSION} ${RUNNER_CONTAINER_HOOKS_VERSION} \
+    && rm /install-tools.sh  # Optional cleanup
 ENV RUNNER_TOOL_CACHE=/opt/hostedtoolcache
-RUN mkdir -p "$RUNNER_TOOL_CACHE" && chown -R runner:runner "$RUNNER_TOOL_CACHE"
-
 # 6. Labels (good practice)
 LABEL org.opencontainers.image.source="https://github.com/crystal-chain/github-action-runner"
 LABEL org.opencontainers.image.description="Ubuntu 24.04 based GitHub Actions runner with build tools & multiple SDKs"
