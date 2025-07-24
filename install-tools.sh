@@ -102,12 +102,12 @@ install_dotnet8() {
     rm packages-microsoft-prod.deb
 }
 
-# Function to install Go 1.22
+# Function to install Go 1.24
 install_go() {
     echo "--------------------------------------------"
-    echo "Installing Go 1.22..."
+    echo "Installing Go 1.24..."
     echo "--------------------------------------------"
-    curl -L https://go.dev/dl/go1.22.3.linux-amd64.tar.gz | tar -C /usr/local -xzf -
+    curl -L https://go.dev/dl/go1.24.5.linux-amd64.tar.gz | tar -C /usr/local -xzf -
     ln -s /usr/local/go/bin/go /usr/local/bin/go
 }
 
@@ -147,11 +147,15 @@ install_buildah() {
     echo "--------------------------------------------"
     echo "Installing Buildah..."
     echo "--------------------------------------------"
-    . /etc/os-release
-    sudo sh -c "echo 'deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_22.04/ /' > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list"
-    curl -fsSL https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_22.04/Release.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/libcontainers.gpg > /dev/null
-    sudo apt-get update
-    sudo apt-get install -y buildah
+    apt-get -y -qq update
+    apt-get -y install bats btrfs-progs git go-md2man golang libapparmor-dev libglib2.0-dev libgpgme11-dev libseccomp-dev libselinux1-dev make runc skopeo libbtrfs-dev
+    git clone https://github.com/containers/buildah.git
+    cd buildah
+    git checkout v1.40.1
+    make
+    make install
+    cd ..
+    rm -rf buildah
 }
 
 # Function to install Kustomize
