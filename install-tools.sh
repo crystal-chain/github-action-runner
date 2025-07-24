@@ -120,13 +120,18 @@ install_rust() {
     export PATH="/home/runner/.cargo/bin:$PATH"
 }
 
-# Function to install Node.js 22.x
-install_nodejs_22() {
+# Function to install Node.js
+install_nodejs() {
     echo "--------------------------------------------"
-    echo "Installing Node.js 22.x..."
+    echo "Installing Node.js"
     echo "--------------------------------------------"
-    curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-    sudo apt-get install -y nodejs
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+    \. "$HOME/.nvm/nvm.sh"
+    nvm install 24
+    node -v # Should print "v24.4.1".
+    nvm current # Should print "v24.4.1".
+    # Verify npm version:
+    npm -v # Should print "11.4.2".
 }
 
 # Function to enable corepack and install Yarn
@@ -221,7 +226,7 @@ main() {
     #install_dotnet8
     install_go
     #install_rust
-    install_nodejs_22
+    install_nodejs
     install_yarn
     install_buildah
     install_kustomize
